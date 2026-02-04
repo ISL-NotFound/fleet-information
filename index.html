@@ -69,10 +69,12 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Mendeteksi Konfigurasi dari Environment atau Manual (Fix API Key Error)
-        const firebaseConfig = typeof window.__firebase_config !== 'undefined' 
-            ? JSON.parse(window.__firebase_config) 
-            : {
+        // PRIORITAS: Gunakan config sistem jika tersedia untuk menghindari API Key Error
+        const getFirebaseConfig = () => {
+            if (typeof window.__firebase_config !== 'undefined') {
+                return JSON.parse(window.__firebase_config);
+            }
+            return {
                 apiKey: "AIzaSyAwzTQjpzU3qPXaYnbHBG-JmZtAjMERKJs",
                 authDomain: "woa-fleet-hub.firebaseapp.com",
                 projectId: "woa-fleet-hub",
@@ -81,7 +83,9 @@
                 appId: "1:174974455884:web:155bd58e28c22b64e9",
                 measurementId: "G-KDN4CJ98E"
             };
-        
+        };
+
+        const firebaseConfig = getFirebaseConfig();
         const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : "cendranova-woa-hub";
         const ADMIN_CODE = "123456"; 
         const HUB_LIST = ['NGO', 'MCT', 'HKG', 'LHR'];
@@ -92,14 +96,20 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Komponen Ikon yang stabil
+        // Komponen Ikon yang lebih aman untuk mencegah removeChild error
         const Icon = ({ name, size = 20, className = "" }) => {
+            const iconRef = useRef(null);
             useEffect(() => { 
-                if (window.lucide) window.lucide.createIcons(); 
+                if (window.lucide && iconRef.current) {
+                    window.lucide.createIcons({
+                        targets: [iconRef.current]
+                    }); 
+                }
             }, [name]);
+
             return (
-                <span key={name} className="inline-flex items-center justify-center pointer-events-none">
-                    <i data-lucide={name} style={{ width: `${size}px`, height: `${size}px` }} className={className}></i>
+                <span className={`inline-flex items-center justify-center pointer-events-none ${className}`} style={{ width: size, height: size }}>
+                    <i ref={iconRef} data-lucide={name} style={{ width: size, height: size }}></i>
                 </span>
             );
         };
@@ -123,7 +133,7 @@
             const [planeToDelete, setPlaneToDelete] = useState(null);
             const [planeToRequest, setPlaneToRequest] = useState(null);
 
-            // UI Feedback
+            // Feedback & Security States
             const [toast, setToast] = useState({ message: "", visible: false });
             const [loginError, setLoginError] = useState("");
             const [attempts, setAttempts] = useState(0);
@@ -140,7 +150,6 @@
                 setTimeout(() => setToast({ message: "", visible: false }), 4000);
             };
 
-            // Loading Timeout Handler
             useEffect(() => {
                 const timer = setTimeout(() => {
                     if (loading) setLoadTimeout(true);
@@ -148,7 +157,6 @@
                 return () => clearTimeout(timer);
             }, [loading]);
 
-            // Cooldown logic
             useEffect(() => {
                 let timer;
                 if (cooldownTime > 0) {
@@ -157,7 +165,7 @@
                 return () => clearInterval(timer);
             }, [cooldownTime]);
 
-            // Authentication (Follow Rule 3)
+            // Auth First (Rule 3)
             useEffect(() => {
                 const initAuth = async () => {
                     try {
@@ -168,8 +176,6 @@
                         }
                     } catch (error) { 
                         console.error("Auth error:", error); 
-                        // Jika auth gagal, kita paksa hentikan loading agar user bisa melihat info error
-                        setLoading(false);
                     }
                 };
                 initAuth();
@@ -177,7 +183,7 @@
                 return () => unsubscribe();
             }, []);
 
-            // Data Fetching (Follow Rule 1 & 2)
+            // Data Fetching (Rule 1 & 2)
             useEffect(() => {
                 if (!user) return;
                 const fleetCol = collection(db, 'artifacts', appId, 'public', 'data', 'fleet');
@@ -197,7 +203,6 @@
                 return () => { unsubFleet(); unsubReq(); };
             }, [user]);
 
-            // Charts
             const chartRef = useRef(null);
             useEffect(() => {
                 if (activeTab === 'dashboard' && isCEO && fleet.length > 0) {
@@ -222,10 +227,10 @@
                 }
             }, [activeTab, isCEO, fleet]);
 
-            // Database Handlers
             const handleAddPlane = async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
+                if (!user) return;
                 try {
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'fleet'), {
                         reg: fd.get('reg'), 
@@ -240,7 +245,7 @@
                         createdAt: new Date().toISOString()
                     });
                     setIsModalOpen(false);
-                    showToast("Armada berhasil didaftarkan!");
+                    showToast("Unit armada berhasil didaftarkan!");
                 } catch (err) { showToast("Gagal menyimpan data."); }
             };
 
@@ -267,6 +272,7 @@
             };
 
             const handleUpdateStatus = async (id, s) => { 
+                if (!user) return;
                 try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', id), { status: s }); } catch (err) { console.error(err); }
             };
 
@@ -286,7 +292,7 @@
                 const inputCode = e.target.code.value;
                 if (inputCode === ADMIN_CODE) {
                     setIsCEO(true); setIsLoginModalOpen(false); setActiveTab('dashboard'); setLoginError(""); setAttempts(0);
-                    showToast("Akses CEO Diterima.");
+                    showToast("Selamat datang, CEO.");
                 } else { 
                     const nextAttempts = attempts + 1;
                     if (nextAttempts >= 3) {
@@ -310,23 +316,18 @@
             }), [fleet, searchQuery, filterSize, filterFleetType]);
 
             if (loading) return (
-                <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
+                <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
                     <div className="w-12 h-12 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-                    <p className="font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Mempersiapkan Radar CendraNova...</p>
+                    <p className="font-bold text-slate-500 uppercase tracking-widest text-xs">Mempersiapkan Radar CendraNova...</p>
                     
                     {loadTimeout && (
                         <div className="mt-8 max-w-sm p-6 bg-white rounded-2xl shadow-xl border border-amber-200 animate-fade">
-                            <p className="text-amber-600 text-xs font-black uppercase mb-3 flex items-center gap-2">
-                                <Icon name="alert-triangle" size={14} /> Masalah Koneksi Terdeteksi
+                            <p className="text-amber-600 text-xs font-black uppercase mb-3 flex items-center justify-center gap-2">
+                                <Icon name="alert-triangle" size={14} /> Radar Bermasalah
                             </p>
                             <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
-                                Radar belum terhubung ke Firebase. Harap pastikan:
+                                Website butuh waktu lama untuk terhubung. Harap pastikan fitur <b>Anonymous Sign-in</b> sudah aktif di Firebase Console Anda.
                             </p>
-                            <ul className="text-[10px] text-slate-400 mt-2 space-y-1 list-disc pl-4 font-bold">
-                                <li>Anonymous Auth di Firebase Console sudah "Enabled"</li>
-                                <li>Firestore Database sudah dibuat di "Test Mode"</li>
-                                <li>GitHub Pages sudah selesai memproses update file</li>
-                            </ul>
                             <button onClick={() => window.location.reload()} className="mt-4 w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">Refresh Radar</button>
                         </div>
                     )}
@@ -335,7 +336,7 @@
 
             return (
                 <div className="min-h-screen flex flex-col text-slate-800">
-                    {/* NAV BAR */}
+                    {/* NAVIGATION */}
                     <nav className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50 px-4 h-20 shadow-sm">
                         <div className="max-w-6xl mx-auto h-full flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -356,7 +357,7 @@
 
                     <main className="max-w-6xl mx-auto p-4 py-8 flex-grow w-full">
                         
-                        {/* VIEW: DASHBOARD (CEO Only) */}
+                        {/* VIEW: DASHBOARD (CEO) */}
                         {activeTab === 'dashboard' && isCEO && (
                             <div className="animate-fade space-y-8">
                                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -384,7 +385,7 @@
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                                     <div>
                                         <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Radar Armada CendraNova</h2>
-                                        <p className="text-slate-500 text-sm">Cari unit yang sesuai dan ajukan permintaan kontrak rute.</p>
+                                        <p className="text-slate-500 text-sm">Temukan unit di Hub NGO, MCT, HKG, dan LHR.</p>
                                     </div>
                                     <div className="flex flex-col gap-3">
                                         <div className="flex gap-1.5 justify-end">
@@ -456,20 +457,20 @@
                                             </div>
                                         </div>
                                     ))}
-                                    {filteredFleet.length === 0 && <div className="col-span-full py-32 text-center text-slate-400 font-bold bg-white border-2 border-dashed border-slate-200 rounded-[3rem] animate-fade"><Icon name="search-x" size={48} className="mx-auto mb-4 opacity-20"/> Armada CendraNova tidak ditemukan di radar.</div>}
+                                    {filteredFleet.length === 0 && <div className="col-span-full py-32 text-center text-slate-400 font-bold bg-white border-2 border-dashed border-slate-200 rounded-[3rem] animate-fade"><Icon name="search-x" size={48} className="mx-auto mb-4 opacity-20"/> Armada tidak ditemukan.</div>}
                                 </div>
                             </div>
                         )}
 
-                        {/* VIEW: INBOX (CEO Only) */}
+                        {/* VIEW: INBOX (CEO) */}
                         {activeTab === 'inbox' && isCEO && (
                             <div className="animate-fade max-w-2xl mx-auto space-y-8">
                                 <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Manajemen Kontrak</h2>
                                 <div className="space-y-4">
-                                    {incoming.length === 0 ? <div className="bg-white p-24 rounded-[3rem] border border-slate-100 text-center shadow-sm"><Icon name="bell-off" size={48} className="mx-auto mb-5 opacity-10"/><p className="font-bold text-slate-400 tracking-tight">Belum ada kontrak koneksi baru.</p></div> : incoming.map(req => (
+                                    {incoming.length === 0 ? <div className="bg-white p-24 rounded-[3rem] border border-slate-100 text-center shadow-sm"><Icon name="bell-off" size={48} className="mx-auto mb-5 opacity-10"/><p className="font-bold text-slate-400 tracking-tight">Belum ada kontrak baru.</p></div> : incoming.map(req => (
                                         <div key={req.id} className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between hover:border-sky-300 transition-all group">
                                             <div className="flex items-center gap-5">
-                                                <div className="w-16 h-16 bg-sky-50 text-sky-600 rounded-[1.2rem] flex items-center justify-center font-black text-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors shadow-inner uppercase">{req.planeReg.charAt(0)}</div>
+                                                <div className="w-16 h-16 bg-sky-50 text-sky-600 rounded-[1.2rem] flex items-center justify-center font-black text-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors shadow-inner uppercase">{req.planeReg?.charAt(0) || 'P'}</div>
                                                 <div className="flex-1">
                                                     <p className="text-sm font-bold leading-tight">
                                                         <span className="text-sky-600 font-black">{req.requesterName}</span> 
@@ -501,7 +502,7 @@
                         <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.6em] mt-8">CendraNova Aviation &copy; 2026</p>
                     </footer>
 
-                    {/* TOAST */}
+                    {/* UI FEEDBACK TOAST */}
                     {toast.visible && (
                         <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm tracking-tight bg-slate-900 text-white animate-fade`}>
                             <Icon name="check-circle" size={18} />
@@ -528,7 +529,7 @@
                         </div>
                     )}
 
-                    {/* MODAL: CUSTOM REQUEST */}
+                    {/* MODAL: REQUEST KONEKSI */}
                     {isRequestModalOpen && planeToRequest && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
                             <form onSubmit={handleSubmitRequest} className="bg-white rounded-[3rem] p-10 w-full max-w-md shadow-2xl animate-fade border border-white/50 relative">
@@ -562,7 +563,7 @@
                                         <input name="ign" required placeholder="Nama CEO Anda" className="w-full bg-slate-50 p-4 rounded-[1.2rem] font-bold border-none outline-none focus:ring-2 focus:ring-sky-500 shadow-inner text-center" autoFocus />
                                     </div>
                                     <div className="space-y-1.5 text-center">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest block text-center text-center">Bandara Tujuan (Hub CendraNova)</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest block text-center">Bandara Tujuan (Hub CendraNova)</label>
                                         <select name="destination" required className="w-full bg-slate-50 p-4 rounded-[1.2rem] font-bold border-none outline-none focus:ring-2 focus:ring-sky-500 shadow-inner appearance-none cursor-pointer text-center">
                                             <option value="" disabled selected>Pilih Hub Tujuan...</option>
                                             {HUB_LIST.map(hub => (
@@ -576,7 +577,7 @@
                         </div>
                     )}
 
-                    {/* MODAL: REGISTRASI UNIT (CEO Only) */}
+                    {/* MODAL: REGISTRASI UNIT */}
                     {isModalOpen && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
                             <form onSubmit={handleAddPlane} className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-lg p-12 animate-fade overflow-hidden relative shadow-black/30">
@@ -638,11 +639,11 @@
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4 text-center">
                             <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-sm shadow-2xl animate-fade text-center border border-white/20">
                                 <div className="w-16 h-16 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner"><Icon name="trash-2" size={32} /></div>
-                                <h3 className="text-xl font-black text-slate-800 mb-2 uppercase">Konfirmasi Hapus</h3>
-                                <p className="text-sm text-slate-500 mb-8 font-medium px-4">Anda yakin ingin menghapus unit ini secara permanen?</p>
+                                <h3 className="text-xl font-black text-slate-800 mb-2 uppercase text-center">Konfirmasi Hapus</h3>
+                                <p className="text-sm text-slate-500 mb-8 font-medium px-4 text-center">Anda yakin ingin menghapus unit ini secara permanen?</p>
                                 <div className="flex flex-col gap-3">
                                     <button onClick={confirmDelete} className="w-full bg-red-500 hover:bg-red-600 text-white py-4 rounded-[1.2rem] font-black shadow-lg shadow-red-100 transition-all active:scale-95 uppercase tracking-widest text-xs cursor-pointer">Hapus Sekarang</button>
-                                    <button onClick={() => { setIsDeleteModalOpen(false); setPlaneToDelete(null); }} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-500 py-4 rounded-[1.2rem] font-black transition-all active:scale-95 uppercase tracking-widest text-xs cursor-pointer">Batalkan</button>
+                                    <button onClick={() => { setIsDeleteModalOpen(false); setPlaneToDelete(null); }} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-500 py-4 rounded-[1.2rem] font-black transition-all active:scale-95 uppercase tracking-widest text-xs cursor-pointer text-center">Batalkan</button>
                                 </div>
                             </div>
                         </div>
@@ -660,9 +661,9 @@
         );
 
         const StatCard = ({ label, value, icon, color, bg }) => (
-            <div className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1">
-                <div className={`w-14 h-14 ${bg} ${color} rounded-[1.4rem] flex items-center justify-center mb-6 shadow-sm shadow-black/5`}>{icon}</div>
-                <div className="text-3xl font-black text-slate-900 tracking-tighter">{value}</div><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{label}</div>
+            <div className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 text-center">
+                <div className={`w-14 h-14 ${bg} ${color} rounded-[1.4rem] flex items-center justify-center mb-6 shadow-sm shadow-black/5 mx-auto`}>{icon}</div>
+                <div className="text-3xl font-black text-slate-900 tracking-tighter text-center">{value}</div><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 text-center">{label}</div>
             </div>
         );
 
