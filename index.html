@@ -69,7 +69,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Mendeteksi Konfigurasi dari Environment (PENTING untuk Fix API Key Error)
+        // Mendeteksi Konfigurasi dari Environment atau Manual (Fix API Key Error)
         const firebaseConfig = typeof window.__firebase_config !== 'undefined' 
             ? JSON.parse(window.__firebase_config) 
             : {
@@ -111,6 +111,7 @@
             const [activeTab, setActiveTab] = useState('katalog'); 
             const [isCEO, setIsCEO] = useState(false); 
             const [loading, setLoading] = useState(true);
+            const [loadTimeout, setLoadTimeout] = useState(false);
 
             // Modal States
             const [isModalOpen, setIsModalOpen] = useState(false);
@@ -139,6 +140,14 @@
                 setTimeout(() => setToast({ message: "", visible: false }), 4000);
             };
 
+            // Loading Timeout Handler
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    if (loading) setLoadTimeout(true);
+                }, 8000);
+                return () => clearTimeout(timer);
+            }, [loading]);
+
             // Cooldown logic
             useEffect(() => {
                 let timer;
@@ -157,7 +166,11 @@
                         } else {
                             await signInAnonymously(auth);
                         }
-                    } catch (error) { console.error("Auth error:", error); }
+                    } catch (error) { 
+                        console.error("Auth error:", error); 
+                        // Jika auth gagal, kita paksa hentikan loading agar user bisa melihat info error
+                        setLoading(false);
+                    }
                 };
                 initAuth();
                 const unsubscribe = onAuthStateChanged(auth, setUser);
@@ -297,9 +310,26 @@
             }), [fleet, searchQuery, filterSize, filterFleetType]);
 
             if (loading) return (
-                <div className="h-screen flex flex-col items-center justify-center bg-slate-50">
-                    <div className="w-10 h-10 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <p className="font-bold text-slate-500 uppercase tracking-widest text-xs">Mempersiapkan Radar...</p>
+                <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
+                    <div className="w-12 h-12 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+                    <p className="font-bold text-slate-500 uppercase tracking-widest text-xs text-center">Mempersiapkan Radar CendraNova...</p>
+                    
+                    {loadTimeout && (
+                        <div className="mt-8 max-w-sm p-6 bg-white rounded-2xl shadow-xl border border-amber-200 animate-fade">
+                            <p className="text-amber-600 text-xs font-black uppercase mb-3 flex items-center gap-2">
+                                <Icon name="alert-triangle" size={14} /> Masalah Koneksi Terdeteksi
+                            </p>
+                            <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                                Radar belum terhubung ke Firebase. Harap pastikan:
+                            </p>
+                            <ul className="text-[10px] text-slate-400 mt-2 space-y-1 list-disc pl-4 font-bold">
+                                <li>Anonymous Auth di Firebase Console sudah "Enabled"</li>
+                                <li>Firestore Database sudah dibuat di "Test Mode"</li>
+                                <li>GitHub Pages sudah selesai memproses update file</li>
+                            </ul>
+                            <button onClick={() => window.location.reload()} className="mt-4 w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">Refresh Radar</button>
+                        </div>
+                    )}
                 </div>
             );
 
@@ -426,6 +456,7 @@
                                             </div>
                                         </div>
                                     ))}
+                                    {filteredFleet.length === 0 && <div className="col-span-full py-32 text-center text-slate-400 font-bold bg-white border-2 border-dashed border-slate-200 rounded-[3rem] animate-fade"><Icon name="search-x" size={48} className="mx-auto mb-4 opacity-20"/> Armada CendraNova tidak ditemukan di radar.</div>}
                                 </div>
                             </div>
                         )}
@@ -435,7 +466,7 @@
                             <div className="animate-fade max-w-2xl mx-auto space-y-8">
                                 <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Manajemen Kontrak</h2>
                                 <div className="space-y-4">
-                                    {incoming.length === 0 ? <div className="bg-white p-24 rounded-[3rem] border border-slate-100 text-center shadow-sm"><Icon name="bell-off" size={48} className="mx-auto mb-5 opacity-10"/><p className="font-bold text-slate-400 tracking-tight">Belum ada rute baru diajukan.</p></div> : incoming.map(req => (
+                                    {incoming.length === 0 ? <div className="bg-white p-24 rounded-[3rem] border border-slate-100 text-center shadow-sm"><Icon name="bell-off" size={48} className="mx-auto mb-5 opacity-10"/><p className="font-bold text-slate-400 tracking-tight">Belum ada kontrak koneksi baru.</p></div> : incoming.map(req => (
                                         <div key={req.id} className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between hover:border-sky-300 transition-all group">
                                             <div className="flex items-center gap-5">
                                                 <div className="w-16 h-16 bg-sky-50 text-sky-600 rounded-[1.2rem] flex items-center justify-center font-black text-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors shadow-inner uppercase">{req.planeReg.charAt(0)}</div>
