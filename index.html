@@ -19,7 +19,7 @@
         import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        // Global bridge untuk akses dari script Babel
+        // Bridge global agar bisa diakses dari script Babel
         window.FirebaseBridge = { initializeApp, getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, where, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged };
     </script>
 
@@ -30,38 +30,15 @@
             background-color: #f8fafc; 
             -webkit-tap-highlight-color: transparent;
         }
-        .chart-container { 
-            position: relative; 
-            width: 100%; 
-            max-width: 450px; 
-            margin: auto; 
-            height: 300px; 
-        }
-        .animate-fade { 
-            animation: fadeIn 0.4s ease-out forwards; 
-        }
-        @keyframes fadeIn { 
-            from { opacity: 0; transform: translateY(10px); } 
-            to { opacity: 1; transform: translateY(0); } 
-        }
-        
+        .chart-container { position: relative; width: 100%; max-width: 450px; margin: auto; height: 300px; }
+        .animate-fade { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        
-        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
-        
-        .shake {
-            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-        }
-        @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
-        }
-
-        /* Custom Select Styling for Size Filter */
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
         .custom-select {
             -webkit-appearance: none;
             -moz-appearance: none;
@@ -79,7 +56,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // PRIORITAS: Gunakan config sistem (Canvas) atau data asli (GitHub)
+        // Inisialisasi Firebase Config
         const getFirebaseConfig = () => {
             if (typeof window.__firebase_config !== 'undefined' && window.__firebase_config) {
                 try { return JSON.parse(window.__firebase_config); } catch(e) { console.error(e); }
@@ -96,6 +73,13 @@
         };
 
         const firebaseConfig = getFirebaseConfig();
+        const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } = window.FirebaseBridge;
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // ID Aplikasi dinamis sesuai mandat sistem (PENTING untuk izin Firestore)
         const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : "isl-404-notfound-hub";
         const ADMIN_CODE = "123456"; 
         
@@ -107,16 +91,8 @@
             { id: 'BKK', label: 'BKK', flag: '🇹🇭' }
         ];
 
-        // Tautan Google Form Resmi ISL
         const ISL_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScZUG2UOqp88KIfP2uzzJegJZqDiAa81my2Z3euumXYZlWtYg/closedform"; 
 
-        const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } = window.FirebaseBridge;
-        
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // Komponen Ikon Stabil (Ref-based)
         const Icon = ({ name, size = 20, className = "" }) => {
             const iconRef = useRef(null);
             useEffect(() => { 
@@ -124,7 +100,6 @@
                     window.lucide.createIcons({ targets: [iconRef.current] }); 
                 }
             }, [name]);
-
             return (
                 <span className={`inline-flex items-center justify-center pointer-events-none ${className}`} style={{ width: size, height: size }}>
                     <i ref={iconRef} data-lucide={name} style={{ width: size, height: size }}></i>
@@ -139,6 +114,7 @@
             const [isCEO, setIsCEO] = useState(false); 
             const [loading, setLoading] = useState(true);
             const [loadTimeout, setLoadTimeout] = useState(false);
+            const [permError, setPermError] = useState(false);
 
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -160,9 +136,8 @@
                 setTimeout(() => setToast({ message: "", visible: false }), 4000);
             };
 
-            // Diagnostic Radar Timer
             useEffect(() => {
-                const timer = setTimeout(() => { if (loading) setLoadTimeout(true); }, 10000);
+                const timer = setTimeout(() => { if (loading) setLoadTimeout(true); }, 15000);
                 return () => clearTimeout(timer);
             }, [loading]);
 
@@ -172,7 +147,7 @@
                 return () => clearInterval(timer);
             }, [cooldownTime]);
 
-            // Authentication (Anonymous)
+            // Tahap 1: Autentikasi HARUS selesai sebelum melakukan query (Rule 3)
             useEffect(() => {
                 const initAuth = async () => {
                     try {
@@ -181,28 +156,43 @@
                         } else {
                             await signInAnonymously(auth);
                         }
-                    } catch (e) { console.error("Auth Error:", e); }
+                    } catch (e) { 
+                        console.error("Auth Error:", e); 
+                        setLoadTimeout(true); 
+                    }
                 };
                 initAuth();
-                const unsubscribe = onAuthStateChanged(auth, setUser);
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    if (u) {
+                        console.log("Autentikasi Berhasil:", u.uid);
+                        setUser(u);
+                    }
+                });
                 return () => unsubscribe();
             }, []);
 
-            // Data Fetching Real-time (RULE 1 & 2)
+            // Tahap 2: Fetch Data hanya jika USER sudah tersedia
             useEffect(() => {
                 if (!user) return;
+                
+                // Gunakan struktur path wajib Rule 1
                 const fleetCol = collection(db, 'artifacts', appId, 'public', 'data', 'fleet');
+                
                 const unsubFleet = onSnapshot(fleetCol, (snap) => {
                     setFleet(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                     setLoading(false);
-                }, (err) => {
-                    console.error("Firestore error:", err);
-                    setLoading(false);
+                    setPermError(false);
+                }, (err) => { 
+                    console.error("Firestore error:", err); 
+                    if (err.code === 'permission-denied') {
+                        setPermError(true);
+                    }
+                    setLoading(false); 
                 });
+                
                 return () => unsubFleet();
             }, [user]);
 
-            // Dashboard Charts
             const chartRef = useRef(null);
             useEffect(() => {
                 if (activeTab === 'dashboard' && isCEO && fleet.length > 0) {
@@ -217,7 +207,7 @@
                                 labels: Object.keys(manuMap),
                                 datasets: [{
                                     data: Object.values(manuMap),
-                                    backgroundColor: ['#0284c7', '#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#ec4899'],
+                                    backgroundColor: ['#0284c7', '#4f46e5', '#10b981', '#f59e0b', '#ef4444'],
                                     borderWidth: 0, cutout: '75%'
                                 }]
                             },
@@ -230,6 +220,7 @@
             const handleAddPlane = async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
+                if (!user) return;
                 try {
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'fleet'), {
                         reg: fd.get('reg'), type: fd.get('type'), manufacturer: fd.get('manufacturer'),
@@ -238,16 +229,16 @@
                         ownerId: user.uid, createdAt: new Date().toISOString()
                     });
                     setIsModalOpen(false);
-                    showToast("Unit 〆404 berhasil didaftarkan!");
-                } catch (err) { showToast("Gagal menyimpan ke Cloud."); }
+                    showToast("Armada berhasil didaftarkan!");
+                } catch (err) { showToast("Gagal menyimpan data."); }
             };
 
             const handleToggleStatus = async (planeId, currentStatus) => {
-                if (!isCEO) return;
+                if (!isCEO || !user) return;
                 const newStatus = currentStatus === 'Kerja' ? 'Nganggur' : 'Kerja';
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet', planeId), { status: newStatus });
-                    showToast(`Status unit diperbarui.`);
+                    showToast(`Status unit diperbarui ke ${newStatus}.`);
                 } catch (err) { showToast("Gagal update status."); }
             };
 
@@ -256,7 +247,7 @@
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'fleet', planeToDelete));
                     setIsDeleteModalOpen(false); setPlaneToDelete(null);
-                    showToast("Unit dihapus dari radar.");
+                    showToast("Unit berhasil dihapus.");
                 } catch (err) { console.error(err); }
             };
 
@@ -265,11 +256,11 @@
                 if (cooldownTime > 0) return;
                 if (e.target.code.value === ADMIN_CODE) {
                     setIsCEO(true); setIsLoginModalOpen(false); setActiveTab('dashboard'); setLoginError(""); setAttempts(0);
-                    showToast("Akses CEO Diterima.");
+                    showToast("Selamat datang, CEO!");
                 } else { 
                     const next = attempts + 1;
-                    if (next >= 3) { setLoginError("Anda bukan CEO disini !"); setCooldownTime(60); setAttempts(0); }
-                    else { setLoginError(`Kode salah ! Sisa: ${3 - next}`); setAttempts(next); }
+                    if (next >= 3) { setLoginError("Akses ditolak!"); setCooldownTime(60); setAttempts(0); }
+                    else { setLoginError(`Kode salah! Sisa percobaan: ${3 - next}`); setAttempts(next); }
                     setIsShaking(true); setTimeout(() => setIsShaking(false), 500);
                 }
                 e.target.code.value = "";
@@ -286,13 +277,18 @@
                 <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
                     <div className="w-12 h-12 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-6"></div>
                     <p className="font-bold text-slate-500 uppercase tracking-widest text-xs">Mempersiapkan Radar 404...</p>
-                    {loadTimeout && (
-                        <div className="mt-8 max-w-sm p-6 bg-white rounded-2xl shadow-xl border border-amber-200 animate-fade">
-                            <p className="text-amber-600 text-xs font-black uppercase mb-3 flex items-center justify-center gap-2 text-center w-full"><Icon name="alert-triangle" size={14} /> Gangguan Radar</p>
-                            <p className="text-[11px] text-slate-500 leading-relaxed text-center">Gagal terhubung ke Firebase. Pastikan domain GitHub Anda sudah didaftarkan di Firebase Console.</p>
-                            <div className="flex flex-col gap-2 mt-4 w-full">
-                                <button onClick={() => window.location.reload()} className="w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">Refresh Radar</button>
-                                <button onClick={() => setLoading(false)} className="w-full py-2 bg-sky-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all font-bold">Muat Manual</button>
+                    
+                    {(loadTimeout || permError) && (
+                        <div className="mt-8 max-w-sm p-6 bg-white rounded-2xl shadow-xl border border-red-200 animate-fade">
+                            <p className="text-red-600 text-xs font-black uppercase mb-3 flex items-center justify-center gap-2"><Icon name="alert-triangle" size={14} /> Masalah Izin Ditemukan</p>
+                            <p className="text-[11px] text-slate-500 leading-relaxed mb-4">
+                                {permError 
+                                    ? "Izin ditolak oleh Firebase. Mohon periksa kembali tab 'Authorized Domains' dan pastikan domain saat ini sudah terdaftar." 
+                                    : "Koneksi memakan waktu terlalu lama. Pastikan Anonymous Auth sudah AKTIF."}
+                            </p>
+                            <div className="flex flex-col gap-2">
+                                <button onClick={() => window.location.reload()} className="w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">Refresh Halaman</button>
+                                <button onClick={() => { setLoading(false); setActiveTab('katalog'); }} className="w-full py-2 bg-sky-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">Masuk ke Antarmuka</button>
                             </div>
                         </div>
                     )}
@@ -301,131 +297,106 @@
 
             return (
                 <div className="min-h-screen flex flex-col text-slate-800 selection:bg-sky-200">
-                    {/* NAVIGATION BAR */}
+                    {/* NAV BAR */}
                     <nav className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50 px-4 h-20 shadow-sm">
                         <div className="max-w-6xl mx-auto h-full flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="bg-sky-600 p-2.5 rounded-2xl text-white shadow-lg shadow-sky-100 transition-transform hover:scale-105"><Icon name="plane" size={24}/></div>
                                 <div className="flex flex-col">
                                     <span className="font-black text-xl leading-none tracking-tighter text-slate-900 uppercase">404 NotFound</span>
-                                    <span className="text-[9px] font-bold text-sky-600 tracking-[0.1em] uppercase mt-1">Member of Infinite Sky Legion</span>
+                                    <span className="text-[9px] font-bold text-sky-600 tracking-[0.1em] uppercase">Member of Infinite Sky Legion</span>
                                 </div>
                             </div>
-                            <div className="flex gap-1.5 sm:gap-3">
+                            <div className="flex gap-2">
                                 {isCEO && <NavTab active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon="layout-dashboard" label="Stats" />}
                                 <NavTab active={activeTab === 'katalog'} onClick={() => setActiveTab('katalog')} icon="list" label="Armada" />
-                                <a 
-                                    href={ISL_FORM_URL} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 px-3 sm:px-6 py-3 rounded-2xl font-black text-[10px] sm:text-[11px] tracking-widest transition-all bg-amber-500 text-white shadow-lg shadow-amber-200 hover:bg-amber-600 hover:scale-105 active:scale-95"
-                                >
+                                <a href={ISL_FORM_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-[10px] tracking-widest bg-amber-500 text-white shadow-lg shadow-amber-100 hover:scale-105 active:scale-95 transition-all">
                                     <Icon name="external-link" size={18} /> 
-                                    <span className="hidden sm:inline uppercase">Request Connection Here!</span>
-                                    <span className="inline sm:hidden uppercase font-black">Request!</span>
+                                    <span className="hidden md:inline uppercase">Request Connection Here!</span>
+                                    <span className="md:hidden uppercase font-bold text-[9px]">Request!</span>
                                 </a>
                             </div>
                         </div>
                     </nav>
 
                     <main className="max-w-6xl mx-auto p-4 py-8 flex-grow w-full">
-                        {/* VIEW: DASHBOARD (CEO Only) */}
+                        {/* VIEW: DASHBOARD */}
                         {activeTab === 'dashboard' && isCEO && (
                             <div className="animate-fade space-y-8">
-                                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 text-center md:text-left items-center md:items-start">
-                                    <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase font-black">Dashboard CEO</h1>
-                                    <button onClick={() => setIsModalOpen(true)} className="bg-sky-600 text-white px-8 py-3 rounded-2xl font-bold shadow-xl shadow-sky-100 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest cursor-pointer font-black">
-                                        <Icon name="plus-circle" size={18}/> Daftarkan Unit
+                                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                                    <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Dashboard CEO</h1>
+                                    <button onClick={() => setIsModalOpen(true)} className="bg-sky-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg hover:scale-105 transition-all uppercase text-xs tracking-widest">
+                                        <Icon name="plus-circle" size={18} className="mr-2 inline-block" /> Daftarkan Unit
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <StatCard label="Unit Armada" value={fleet.length} icon={<Icon name="plane" size={24}/>} color="text-sky-600" bg="bg-sky-50" />
                                     <StatCard label="Hub Aktif" value={new Set(fleet.map(p => p.hub)).size} icon={<Icon name="map-pin" size={24}/>} color="text-indigo-600" bg="bg-indigo-50" />
                                     <StatCard label="Siap Terbang" value={fleet.filter(p => p.status === 'Kerja').length} icon={<Icon name="check-circle" size={24}/>} color="text-emerald-600" bg="bg-emerald-50" />
                                     <StatCard label="Nganggur" value={fleet.filter(p => p.status === 'Nganggur').length} icon={<Icon name="clock" size={24}/>} color="text-amber-600" bg="bg-amber-50" />
                                 </div>
                                 <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                                    <h3 className="font-bold text-slate-800 mb-8 flex items-center gap-2.5 uppercase tracking-tighter font-black"><span className="w-1.5 h-6 bg-sky-500 rounded-full font-black"></span> Distribusi Armada</h3>
+                                    <h3 className="font-bold text-slate-800 mb-8 uppercase tracking-tighter"><span className="w-1.5 h-6 bg-sky-500 rounded-full inline-block mr-2 align-middle"></span> Distribusi Armada</h3>
                                     <div className="chart-container"><canvas id="fleetChart"></canvas></div>
                                 </div>
                             </div>
                         )}
 
-                        {/* VIEW: KATALOG (Fleet Information) */}
+                        {/* VIEW: KATALOG */}
                         {activeTab === 'katalog' && (
                             <div className="animate-fade space-y-8">
                                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
                                     <div className="space-y-1">
-                                        <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase text-center md:text-left font-black">Fleet Information</h2>
-                                        <p className="text-slate-500 text-sm text-center md:text-left">Daftar armada resmi ISL〆404 yang tersedia di pangkalan Hub kami untuk aliansi ISL.</p>
+                                        <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Fleet Information</h2>
+                                        <p className="text-slate-500 text-sm">Informasi armada resmi ISL〆404 di Hub utama.</p>
                                     </div>
                                     <div className="flex flex-col gap-3 items-center md:items-end">
                                         <div className="flex flex-wrap gap-1.5 justify-center md:justify-end">
                                             <FilterBtn active={filterHub === 'All'} onClick={() => setFilterHub('All')} label="ALL HUB" />
-                                            {HUB_DATA.map(h => (
-                                                <FilterBtn 
-                                                    key={h.id} 
-                                                    active={filterHub === h.id} 
-                                                    onClick={() => setFilterHub(h.id)} 
-                                                    label={`${h.flag} ${h.label}`} 
-                                                />
-                                            ))}
+                                            {HUB_DATA.map(h => <FilterBtn key={h.id} active={filterHub === h.id} onClick={() => setFilterHub(h.id)} label={`${h.flag} ${h.label}`} />)}
                                         </div>
                                         <div className="flex gap-1.5 items-center">
                                             <FilterBtn active={filterSize === 'All'} onClick={() => setFilterSize('All')} label="ALL SIZE" />
-                                            <div className="relative">
-                                                <select 
-                                                    value={filterSize === 'All' ? '' : filterSize}
-                                                    onChange={(e) => setFilterSize(e.target.value)}
-                                                    className={`custom-select px-4 py-1.5 rounded-lg text-[9px] font-black tracking-widest transition-all cursor-pointer outline-none border ${filterSize !== 'All' ? 'bg-sky-600 text-white border-transparent shadow-sm' : 'bg-white text-slate-400 border-slate-200 hover:border-sky-300'}`}
-                                                >
-                                                    <option value="" disabled hidden>SELECT TYPE</option>
-                                                    {['A', 'B', 'C', 'D', 'E', 'F'].map(s => (
-                                                        <option key={s} value={s} className="text-slate-800 bg-white">TYPE {s}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
+                                            <select value={filterSize === 'All' ? '' : filterSize} onChange={(e) => setFilterSize(e.target.value)} className="custom-select px-4 py-1.5 rounded-lg text-[9px] font-black tracking-widest outline-none border bg-white text-slate-400 border-slate-200 hover:border-sky-300">
+                                                <option value="" disabled hidden>TYPE</option>
+                                                {['A', 'B', 'C', 'D', 'E', 'F'].map(s => <option key={s} value={s} className="text-slate-800">TYPE {s}</option>)}
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="relative group">
                                     <div className="absolute inset-y-0 left-0 pl-5 flex items-center text-slate-400 group-focus-within:text-sky-500 transition-colors"><Icon name="search" size={18} /></div>
-                                    <input type="text" placeholder="Cari armada berdasarkan Registrasi atau Model..." className="w-full bg-white border border-slate-200 rounded-[1.5rem] py-5 pl-14 pr-6 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all shadow-sm font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                                    <input type="text" placeholder="Cari armada (Reg/Model)..." className="w-full bg-white border border-slate-200 rounded-[1.5rem] py-5 pl-14 pr-6 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all shadow-sm font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {filteredFleet.map(p => (
                                         <div key={p.id} className="bg-white rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl transition-all overflow-hidden flex flex-col group card-hover">
                                             <div className="p-8 flex-grow">
-                                                <div className="flex justify-between items-start mb-6 text-center md:text-left">
+                                                <div className="flex justify-between items-start mb-6">
                                                     <div>
-                                                        <span className="font-mono font-black text-2xl text-slate-900 block tracking-tighter group-hover:text-sky-600 transition-colors uppercase font-black">{p.reg}</span>
-                                                        <div className="flex items-center justify-center md:justify-start gap-2 mt-1">
-                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] font-bold">{p.manufacturer}</p>
-                                                            <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${p.fleetType === 'Cargo' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{p.fleetType}</span>
+                                                        <span className="font-mono font-black text-2xl text-slate-900 block tracking-tighter uppercase">{p.reg}</span>
+                                                        <div className="flex items-center gap-2 mt-1 font-bold">
+                                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest">{p.manufacturer}</p>
+                                                            <span className={`px-2 py-0.5 rounded text-[8px] uppercase tracking-widest ${p.fleetType === 'Cargo' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{p.fleetType}</span>
                                                         </div>
                                                     </div>
                                                     <span className="text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-tighter shadow-sm bg-slate-100 text-slate-600 border border-slate-200 font-bold">Type {p.cat}</span>
                                                 </div>
-                                                <h4 className="font-extrabold text-slate-800 text-lg mb-1 text-center md:text-left font-black">{p.type}</h4>
-                                                
-                                                <div className="mt-4 grid grid-cols-2 gap-3">
-                                                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1 items-center text-center">
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest font-bold">Hub Basis</span>
+                                                <h4 className="font-extrabold text-slate-800 text-lg mb-1">{p.type}</h4>
+                                                <div className="mt-4 grid grid-cols-2 gap-3 text-center font-bold text-xs">
+                                                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1 items-center">
+                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Hub Basis</span>
                                                         <div className="flex items-center justify-center gap-1.5">
-                                                            <span className="text-xs">{HUB_DATA.find(h => h.id === p.hub)?.flag || '📍'}</span>
-                                                            <span className="text-xs font-black text-slate-700 uppercase font-black">{p.hub}</span>
+                                                            <span>{HUB_DATA.find(h => h.id === p.hub)?.flag || '📍'}</span>
+                                                            <span className="uppercase">{p.hub}</span>
                                                         </div>
                                                     </div>
-                                                    <button 
-                                                        onClick={() => handleToggleStatus(p.id, p.status)}
-                                                        disabled={!isCEO}
-                                                        className={`p-3 rounded-2xl border border-slate-100 flex flex-col gap-1 transition-all items-center text-center ${isCEO ? 'hover:bg-slate-100 cursor-pointer active:scale-95' : 'bg-slate-50 cursor-default'}`}
-                                                    >
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest font-bold">Status Op</span>
-                                                        <div className="flex items-center justify-center gap-1.5 text-[10px] font-black text-slate-700 uppercase">
-                                                            <div className={`w-2.5 h-2.5 rounded-full ${p.status === 'Kerja' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                                                    <button onClick={() => handleToggleStatus(p.id, p.status)} disabled={!isCEO} className={`p-3 rounded-2xl border border-slate-100 flex flex-col gap-1 transition-all items-center ${isCEO ? 'hover:bg-slate-100 cursor-pointer active:scale-95' : 'bg-slate-50 cursor-default'}`}>
+                                                        <span className="text-[8px] text-slate-400 uppercase tracking-widest uppercase">Status Op</span>
+                                                        <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase">
+                                                            <div className={`w-2 h-2 rounded-full ${p.status === 'Kerja' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
                                                             {p.status}
                                                         </div>
                                                     </button>
@@ -436,85 +407,64 @@
                                                     <Icon name="navigation-2" size={12} className="text-slate-400" />
                                                     <span className="text-[10px] font-black text-slate-500 uppercase font-bold">Range: {(p.range || 0).toLocaleString()} NM</span>
                                                 </div>
-                                                {isCEO && (
-                                                    <button onClick={() => { setPlaneToDelete(p.id); setIsDeleteModalOpen(true); }} className="text-slate-300 hover:text-red-500 p-2 transition-colors cursor-pointer"><Icon name="trash-2" size={20} /></button>
-                                                )}
+                                                {isCEO && <button onClick={() => { setPlaneToDelete(p.id); setIsDeleteModalOpen(true); }} className="text-slate-300 hover:text-red-500 p-2 transition-colors cursor-pointer"><Icon name="trash-2" size={20} /></button>}
                                             </div>
                                         </div>
                                     ))}
-                                    {filteredFleet.length === 0 && <div className="col-span-full py-32 text-center text-slate-400 font-bold bg-white border-2 border-dashed border-slate-200 rounded-[3rem] animate-fade font-black">Armada tidak ditemukan pada radar.</div>}
                                 </div>
                             </div>
                         )}
                     </main>
 
-                    {/* CEO FOOTER */}
                     <footer className="py-14 text-center border-t border-slate-100 mt-auto bg-white/50">
-                        {!isCEO ? (
-                            <button onClick={() => { setIsLoginModalOpen(true); setAttempts(0); setLoginError(""); }} className="text-slate-300 hover:text-sky-400 text-[10px] font-bold uppercase tracking-[0.4em] flex items-center justify-center gap-3 mx-auto transition-all cursor-pointer font-black"><Icon name="lock" size={12}/> CEO 404 Access</button>
-                        ) : (
-                            <button onClick={() => setIsCEO(false)} className="text-red-300 hover:text-red-500 text-[10px] font-bold uppercase tracking-[0.4em] flex items-center gap-3 mx-auto transition-all cursor-pointer font-black"><Icon name="log-out" size={12}/> Keluar Pusat Kontrol</button>
-                        )}
-                        <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.6em] mt-8 font-black">404 NotFound &copy; 2026 • Infinite Sky Legion Member</p>
+                        {!isCEO ? <button onClick={() => setIsLoginModalOpen(true)} className="text-slate-300 hover:text-sky-400 text-[10px] font-bold uppercase tracking-[0.4em] flex items-center justify-center gap-3 mx-auto cursor-pointer font-black"><Icon name="lock" size={12}/> CEO 404 Access</button> : <button onClick={() => setIsCEO(false)} className="text-red-300 hover:text-red-500 text-[10px] font-bold uppercase tracking-[0.4em] flex items-center gap-3 mx-auto cursor-pointer font-black"><Icon name="log-out" size={12}/> Keluar</button>}
+                        <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.6em] mt-8">404 NotFound &copy; 2026 • Member of Infinite Sky Legion</p>
                     </footer>
 
-                    {/* UI FEEDBACK TOAST */}
-                    {toast.visible && (
-                        <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm tracking-tight bg-slate-900 text-white animate-fade font-black`}>
-                            <Icon name="check-circle" size={18} />
-                            {toast.message}
-                        </div>
-                    )}
+                    {toast.visible && <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm bg-slate-900 text-white animate-fade"><Icon name="check-circle" size={18} />{toast.message}</div>}
 
-                    {/* MODAL: LOGIN CEO */}
                     {isLoginModalOpen && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                             <form onSubmit={handleLogin} className={`bg-white rounded-[3rem] p-12 w-full max-w-sm shadow-2xl animate-fade text-center border border-white/50 ${isShaking ? 'shake' : ''}`}>
-                                <div className="w-16 h-16 bg-sky-50 text-sky-600 rounded-[1.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner font-black font-black font-black"><Icon name="shield-check" size={32} /></div>
-                                <h3 className="text-xl font-black text-slate-800 mb-2 tracking-tight uppercase text-center font-black font-black">Otentikasi CEO</h3>
-                                <div className="relative mb-8 text-center items-center font-black">
-                                    <input name="code" type="password" placeholder="••••••" maxLength="6" disabled={cooldownTime > 0} className={`w-full bg-slate-50 p-6 rounded-[1.5rem] text-center text-3xl font-black tracking-[0.6em] border-none outline-none focus:ring-2 focus:ring-sky-500 shadow-inner transition-all ${cooldownTime > 0 ? 'opacity-50 grayscale font-black' : ''}`} required autoFocus />
-                                    {loginError && <p className="text-red-500 text-[10px] font-black uppercase mt-3 tracking-widest text-center font-black font-black">{loginError}</p>}
+                                <h3 className="text-xl font-black text-slate-800 mb-4 uppercase">Otentikasi CEO</h3>
+                                <div className="relative mb-8">
+                                    <input name="code" type="password" placeholder="••••••" maxLength="6" disabled={cooldownTime > 0} className="w-full bg-slate-50 p-6 rounded-[1.5rem] text-center text-3xl font-black tracking-[0.6em] outline-none focus:ring-2 focus:ring-sky-500 shadow-inner" required autoFocus />
+                                    {loginError && <p className="text-red-500 text-[10px] font-bold uppercase mt-3 tracking-widest">{loginError}</p>}
                                 </div>
-                                <button type="submit" disabled={cooldownTime > 0} className={`w-full py-5 rounded-[1.3rem] font-black shadow-xl transition-all active:scale-95 uppercase tracking-[0.2em] text-xs cursor-pointer font-black font-black ${cooldownTime > 0 ? 'bg-slate-300 text-slate-500 cursor-not-allowed font-black' : 'bg-sky-600 hover:bg-sky-700 text-white shadow-sky-100 font-black'}`}>
-                                    {cooldownTime > 0 ? `Terkunci (${cooldownTime}s)` : 'Akses Sistem'}
-                                </button>
-                                <button type="button" onClick={() => { setIsLoginModalOpen(false); setLoginError(""); setAttempts(0); }} className="w-full mt-4 text-slate-400 text-[10px] font-black py-2 tracking-widest uppercase hover:text-slate-600 transition-colors cursor-pointer text-center font-black font-black font-black">Batalkan</button>
+                                <button type="submit" disabled={cooldownTime > 0} className="w-full py-5 rounded-[1.3rem] font-black shadow-xl uppercase tracking-widest text-xs bg-sky-600 text-white active:scale-95 transition-all">{cooldownTime > 0 ? `Terkunci (${cooldownTime}s)` : 'Akses Sistem'}</button>
+                                <button type="button" onClick={() => setIsLoginModalOpen(false)} className="w-full mt-4 text-slate-400 text-[10px] font-bold uppercase tracking-widest hover:text-slate-600 transition-colors">Batalkan</button>
                             </form>
                         </div>
                     )}
 
-                    {/* MODAL: REGISTRASI UNIT */}
                     {isModalOpen && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
-                            <form onSubmit={handleAddPlane} className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-lg p-12 animate-fade my-auto relative font-black">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-500 bg-slate-50 p-2 rounded-full transition-all cursor-pointer font-black"><Icon name="x" size={20}/></button>
-                                <h3 className="text-2xl font-black mb-8 text-center uppercase font-black tracking-tighter">Registrasi Unit 〆404</h3>
-                                <div className="grid grid-cols-2 gap-4 text-sm font-black">
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reg Unit</label><input name="reg" required placeholder="PK-404" className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-sky-500 uppercase font-black" /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Model Pesawat</label><input name="type" required placeholder="B77W / A359" className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-sky-500 font-black" /></div>
-                                    <div className="space-y-1 text-center"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-bold">Tipe Layanan</label><select name="fleetType" className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none cursor-pointer text-center font-black"><option value="Pax">Passenger (PAX)</option><option value="Cargo">Cargo</option></select></div>
-                                    <div className="space-y-1 text-center"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-bold">Kelas Ukuran</label><select name="cat" className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none cursor-pointer text-center font-black">{['A', 'B', 'C', 'D', 'E', 'F'].map(c => <option key={c} value={c}>Type {c}</option>)}</select></div>
-                                    <div className="space-y-1 text-center"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center block font-black font-bold">Hub Basis</label><select name="hub" className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none cursor-pointer text-center font-black">{HUB_DATA.map(h => <option key={h.id} value={h.id}>{h.id} Hub</option>)}</select></div>
-                                    <div className="space-y-1 text-center"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center block font-black font-bold">Range (NM)</label><input name="range" type="number" required placeholder="7000" className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-sky-500 text-center font-black" /></div>
-                                    <div className="col-span-2 space-y-1 text-center"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center block font-black font-bold">Manufaktur</label><select name="manufacturer" className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none cursor-pointer text-center font-black">{['Airbus', 'Boeing', 'ATR', 'Embraer', 'Other'].map(m => <option key={m} value={m}>{m}</option>)}</select></div>
-                                    <div className="col-span-2 space-y-1 text-center"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center block font-black font-bold text-center font-black">Status Unit</label><select name="status" className="w-full bg-slate-50 p-4 rounded-2xl font-bold outline-none cursor-pointer text-center font-black font-bold"><option value="Kerja">Kerja</option><option value="Nganggur">Nganggur</option></select></div>
+                            <form onSubmit={handleAddPlane} className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-lg p-10 animate-fade my-auto relative">
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-500"><Icon name="x" size={24} /></button>
+                                <h3 className="text-2xl font-black mb-8 text-center uppercase">Daftar Unit 〆404</h3>
+                                <div className="grid grid-cols-2 gap-4 text-sm font-bold">
+                                    <div className="space-y-1"><label className="text-[10px] text-slate-400 uppercase">Reg Unit</label><input name="reg" required placeholder="PK-404" className="w-full bg-slate-50 p-4 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 uppercase" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] text-slate-400 uppercase">Model Pesawat</label><input name="type" required placeholder="B77W / A359" className="w-full bg-slate-50 p-4 rounded-xl outline-none focus:ring-2 focus:ring-sky-500" /></div>
+                                    <div className="space-y-1"><label className="text-[10px] text-slate-400 uppercase">Layanan</label><select name="fleetType" className="w-full bg-slate-50 p-4 rounded-xl outline-none cursor-pointer"><option value="Pax">Pax</option><option value="Cargo">Cargo</option></select></div>
+                                    <div className="space-y-1"><label className="text-[10px] text-slate-400 uppercase">Size</label><select name="cat" className="w-full bg-slate-50 p-4 rounded-xl outline-none cursor-pointer">{['S', 'M', 'L', 'XL', 'A', 'B', 'C', 'D', 'E', 'F'].map(c => <option key={c} value={c}>Type {c}</option>)}</select></div>
+                                    <div className="space-y-1"><label className="text-[10px] text-slate-400 uppercase">Hub Basis</label><select name="hub" className="w-full bg-slate-50 p-4 rounded-xl outline-none cursor-pointer">{HUB_DATA.map(h => <option key={h.id} value={h.id}>{h.id}</option>)}</select></div>
+                                    <div className="space-y-1"><label className="text-[10px] text-slate-400 uppercase">Range (NM)</label><input name="range" type="number" required placeholder="7000" className="w-full bg-slate-50 p-4 rounded-xl outline-none focus:ring-2 focus:ring-sky-500" /></div>
+                                    <div className="col-span-2 space-y-1"><label className="text-[10px] text-slate-400 uppercase">Manufaktur</label><select name="manufacturer" className="w-full bg-slate-50 p-4 rounded-xl outline-none cursor-pointer"><option value="Airbus">Airbus</option><option value="Boeing">Boeing</option><option value="Other">Lainnya</option></select></div>
+                                    <div className="col-span-2 space-y-1"><label className="text-[10px] text-slate-400 uppercase">Status</label><select name="status" className="w-full bg-slate-50 p-4 rounded-xl outline-none cursor-pointer font-bold"><option value="Kerja">Kerja</option><option value="Nganggur">Nganggur</option></select></div>
                                 </div>
-                                <button type="submit" className="w-full bg-sky-600 text-white py-5 rounded-3xl font-black shadow-xl mt-8 uppercase tracking-widest text-sm transition-all active:scale-95 font-black">Simpan Unit</button>
+                                <button type="submit" className="w-full bg-sky-600 text-white py-5 rounded-2xl font-black shadow-xl mt-8 uppercase tracking-widest text-sm transition-all active:scale-95">Simpan Unit</button>
                             </form>
                         </div>
                     )}
 
-                    {/* MODAL: KONFIRMASI HAPUS */}
                     {isDeleteModalOpen && (
                         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-                            <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-sm shadow-2xl animate-fade text-center border border-white/20 font-black font-black">
-                                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner font-black font-black font-black"><Icon name="trash-2" size={32} /></div>
-                                <h3 className="text-xl font-black mb-4 uppercase font-black tracking-tight">Konfirmasi Hapus</h3>
-                                <p className="text-sm text-slate-500 mb-8 font-bold text-center">Anda yakin ingin menghapus unit ini secara permanen dari pangkalan 〆404?</p>
-                                <div className="flex flex-col gap-3 font-black">
-                                    <button onClick={confirmDelete} className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 font-black">Hapus Sekarang</button>
-                                    <button onClick={() => { setIsDeleteModalOpen(false); setPlaneToDelete(null); }} className="w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-black transition-all active:scale-95 uppercase tracking-widest text-xs cursor-pointer text-center font-black font-bold">Batalkan</button>
+                            <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-sm shadow-2xl animate-fade text-center border border-white/20">
+                                <h3 className="text-xl font-black mb-4 uppercase">Konfirmasi Hapus</h3>
+                                <p className="text-sm text-slate-500 mb-8 font-bold">Hapus unit ini selamanya?</p>
+                                <div className="flex flex-col gap-3">
+                                    <button onClick={confirmDelete} className="w-full bg-red-500 text-white py-4 rounded-xl font-black uppercase text-xs transition-all active:scale-95">Hapus Sekarang</button>
+                                    <button onClick={() => setIsDeleteModalOpen(false)} className="w-full bg-slate-100 text-slate-500 py-4 rounded-xl font-black uppercase text-xs">Batalkan</button>
                                 </div>
                             </div>
                         </div>
@@ -523,24 +473,21 @@
             );
         }
 
-        // Sub-komponen Navigasi
         const NavTab = ({ active, onClick, icon, label }) => (
-            <button onClick={onClick} className={`relative flex items-center gap-2 px-4 sm:px-7 py-3.5 rounded-2xl font-black text-[10px] sm:text-[11px] tracking-widest transition-all cursor-pointer ${active ? 'bg-sky-600 text-white shadow-lg shadow-sky-200' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-black'}`}>
-                <Icon name={icon} size={18} /> <span className="hidden md:inline uppercase ml-1 font-black">{label}</span>
+            <button onClick={onClick} className={`relative flex items-center gap-2 px-4 sm:px-7 py-3.5 rounded-2xl font-black text-[10px] sm:text-[11px] tracking-widest transition-all cursor-pointer ${active ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100'}`}>
+                <Icon name={icon} size={18} /> <span className="hidden md:inline uppercase ml-1">{label}</span>
             </button>
         );
 
-        // Sub-komponen Filter Button
         const FilterBtn = ({ active, onClick, label }) => (
-            <button onClick={onClick} className={`px-4 py-1.5 rounded-lg text-[9px] font-black tracking-widest transition-all cursor-pointer ${active ? 'bg-sky-600 text-white shadow-sm font-black' : 'bg-white text-slate-400 border border-slate-200 hover:border-sky-300 font-black'}`}>{label}</button>
+            <button onClick={onClick} className={`px-4 py-1.5 rounded-lg text-[9px] font-black tracking-widest transition-all cursor-pointer ${active ? 'bg-sky-600 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-200'}`}>{label}</button>
         );
 
-        // Sub-komponen Statistik Card
         const StatCard = ({ label, value, icon, color, bg }) => (
-            <div className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 text-center font-black">
-                <div className={`w-14 h-14 ${bg} ${color} rounded-[1.4rem] flex items-center justify-center mb-6 shadow-sm shadow-black/5 mx-auto font-black font-black`}>{icon}</div>
-                <div className="text-3xl font-black text-slate-900 tracking-tighter text-center font-black font-black">{value}</div>
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 text-center font-bold font-black">{label}</div>
+            <div className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1">
+                <div className={`w-14 h-14 ${bg} ${color} rounded-[1.4rem] flex items-center justify-center mb-6 shadow-sm shadow-black/5 mx-auto`}>{icon}</div>
+                <div className="text-3xl font-black text-slate-900 tracking-tighter text-center">{value}</div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 text-center">{label}</div>
             </div>
         );
 
